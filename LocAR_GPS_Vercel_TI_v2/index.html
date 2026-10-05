@@ -4,10 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#000000" />
-  <title>LocAR GPS - Laboratorio de Redes</title>
+  <title>LocAR GPS - Pizzeria</title>
   <style>
     * { box-sizing: border-box; }
-    html, body { margin:0; width:100%; height:100%; overflow:hidden; font-family:Arial,sans-serif; background:#000; }
+    html, body { margin:0; width:100%; height:100%; overflow:hidden; font-family:Arial,sans-serif; background:transparent; }
+    #camera { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:-1; }
     #ar-canvas { position:fixed; inset:0; width:100%; height:100%; display:block; }
     #panel {
       position:fixed; z-index:10; top:12px; left:12px; right:12px;
@@ -27,13 +28,17 @@
   </style>
 </head>
 <body>
+  <!-- Video de cámara como fondo -->
+  <video id="camera" autoplay playsinline></video>
+
+  <!-- Canvas para LocAR -->
   <canvas id="ar-canvas"></canvas>
 
   <div id="panel">
     <b>AR por ubicación — LocAR.js</b><br>
     <span id="coords">GPS: todavía no iniciado</span><br>
     <span id="accuracy">Precisión: —</span><br>
-    <span id="distance">Distancia a la Pizzeria Italiana: —</span>
+    <span id="distance">Distancia a la pizzeria: —</span>
     <div id="status">Pulsa “INICIAR AR” y acepta los permisos.</div>
     <button id="start">INICIAR AR</button>
   </div>
@@ -46,3 +51,4 @@
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>
+
