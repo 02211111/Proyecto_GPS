@@ -1,18 +1,18 @@
 {
-  "name": "locar-gps-ti-v2",
-  "private": true,
+  "name": "ar-gps-laboratorio-redes",
   "version": "1.0.0",
-  "type": "module",
+  "description": "Aplicación de realidad aumentada basada en geolocalización para el Laboratorio de Redes.",
+  "main": "src/main.js",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "start": "serve ."
   },
-  "dependencies": {
-    "locar": "0.2.12",
-    "three": "0.181.0"
-  },
-  "devDependencies": {
-    "vite": "^7.1.5"
-  }
+  "keywords": [
+    "AR",
+    "AR.js",
+    "A-Frame",
+    "geolocalización",
+    "GPS"
+  ],
+  "author": "Lietis",
+  "license": "MIT"
 }
