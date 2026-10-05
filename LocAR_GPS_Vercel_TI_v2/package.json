@@ -1,18 +1,9 @@
 {
   "name": "ar-gps-laboratorio-redes",
-  "version": "1.0.0",
-  "description": "Aplicación de realidad aumentada basada en geolocalización para el Laboratorio de Redes.",
-  "main": "src/main.js",
+  "version": "2.0.0",
+  "description": "AR geolocalizada con AR.js + A-Frame",
   "scripts": {
     "start": "serve ."
   },
-  "keywords": [
-    "AR",
-    "AR.js",
-    "A-Frame",
-    "geolocalización",
-    "GPS"
-  ],
-  "author": "Lietis",
   "license": "MIT"
 }
