@@ -39,7 +39,7 @@ function makeBox(color, size = 10) {
 btn.addEventListener("click", async () => {
   btn.disabled = true;
   btn.textContent = "INICIANDO...";
-  setStatus("Solicitando cámara y sensores...");
+  setStatus("Solicitando cámara y ubicación...");
 
   try {
     const app = new App({
@@ -49,7 +49,7 @@ btn.addEventListener("click", async () => {
         near: 0.001,
         far: 2000
       },
-      showVideoBackground: true,   // ✅ ahora sí activa la cámara
+      showVideoBackground: true,   // ✅ activa cámara como fondo
       videoConstraints: {
         video: { facingMode: "environment" }
       }
@@ -60,7 +60,7 @@ btn.addEventListener("click", async () => {
     locar.setGpsOptions({
       enableHighAccuracy: true,
       maximumAge: 0,
-      timeout: 30000
+      timeout: 60000   // espera hasta 60s por señal GPS
     });
 
     let objectsAdded = false;
@@ -68,7 +68,7 @@ btn.addEventListener("click", async () => {
     locar.on("gpserror", (err) => {
       const code = err?.code ?? "";
       const msg = err?.message ?? "Error desconocido";
-      setStatus(`Error GPS ${code}: ${msg}`);
+      setStatus(`Error GPS ${code}: ${msg}. Activa ubicación en el navegador.`);
       btn.disabled = false;
       btn.textContent = "REINTENTAR";
     });
@@ -85,28 +85,28 @@ btn.addEventListener("click", async () => {
       if (!objectsAdded) {
         // Cubo magenta en la ubicación del laboratorio
         const targetBox = makeBox(0xff00ff, 12);
-        locar.add(targetBox, TARGET.lat, TARGET.lon, 6);
+        locar.add(targetBox, TARGET.lat, TARGET.lon, 2);
 
-        // Cubos cardinales alrededor de tu posición (~50 m)
+        // Cubos cardinales alrededor de tu posición (~10 m)
         const refs = [
-          { dLat:  0.0005, dLon:  0,      color: 0xff0000 }, // norte
-          { dLat: -0.0005, dLon:  0,      color: 0xffff00 }, // sur
-          { dLat:  0,      dLon: -0.0005, color: 0x00ffff }, // oeste
-          { dLat:  0,      dLon:  0.0005, color: 0x00ff00 }  // este
+          { dLat:  0.0001, dLon:  0,      color: 0xff0000 }, // norte
+          { dLat: -0.0001, dLon:  0,      color: 0xffff00 }, // sur
+          { dLat:  0,      dLon: -0.0001, color: 0x00ffff }, // oeste
+          { dLat:  0,      dLon:  0.0001, color: 0x00ff00 }  // este
         ];
 
         for (const r of refs) {
           const box = makeBox(r.color, 10);
-          locar.add(box, c.latitude + r.dLat, c.longitude + r.dLon, 5);
+          locar.add(box, c.latitude + r.dLat, c.longitude + r.dLon, 2);
         }
 
         objectsAdded = true;
-        setStatus("GPS inicial recibido. Gira lentamente 360° y busca los cubos.");
+        setStatus("GPS recibido. Gira lentamente 360° y busca los cubos.");
         btn.style.display = "none";
       }
     });
 
-    setStatus("Cámara iniciada. Solicitando ubicación GPS...");
+    setStatus("Cámara iniciada. Esperando señal GPS...");
     await locar.startGps();
 
   } catch (e) {
@@ -117,3 +117,4 @@ btn.addEventListener("click", async () => {
     btn.textContent = "REINTENTAR";
   }
 });
+
