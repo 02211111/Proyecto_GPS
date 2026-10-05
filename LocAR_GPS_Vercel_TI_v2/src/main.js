@@ -8,22 +8,15 @@ const accuracyEl = document.getElementById("accuracy");
 const distanceEl = document.getElementById("distance");
 const canvas = document.getElementById("ar-canvas");
 
-// Inicializar video de cámara como fondo
-const videoEl = document.getElementById("camera");
-navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-  .then(stream => { videoEl.srcObject = stream; })
-  .catch(err => {
-    console.error("Error al iniciar cámara:", err);
-    setStatus("No se pudo acceder a la cámara");
-  });
-
 const TARGET = {
   lat: -2.291122,
   lon: -78.1141843,
   name: "LABORATORIO DE REDES"
 };
 
-function setStatus(msg) { statusEl.textContent = msg; }
+function setStatus(msg) {
+  statusEl.textContent = msg;
+}
 
 function haversineMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000;
@@ -51,12 +44,21 @@ btn.addEventListener("click", async () => {
   try {
     const app = new App({
       canvas,
-      cameraOptions: { hFov: 80, near: 0.001, far: 2000 },
-      videoConstraints: { video: { facingMode: "environment" } }
+      cameraOptions: {
+        hFov: 80,
+        near: 0.001,
+        far: 2000
+      },
+      showVideoBackground: true,   // ✅ coma corregida aquí
+      videoConstraints: {
+        video: { facingMode: "environment" }
+      }
     });
 
+    // App.start() inicia cámara/orientación y entrega el objeto LocAR.
     const locar = await app.start();
 
+    // Configurar GPS ANTES de arrancarlo.
     locar.setGpsOptions({
       enableHighAccuracy: true,
       maximumAge: 0,
@@ -76,35 +78,42 @@ btn.addEventListener("click", async () => {
     locar.on("gpsupdate", (ev) => {
       const c = ev.position.coords;
 
-      coordsEl.textContent = `GPS: ${c.latitude.toFixed(7)}, ${c.longitude.toFixed(7)}`;
-      accuracyEl.textContent = `Precisión: ${Math.round(c.accuracy)} m`;
+      coordsEl.textContent =
+        `GPS: ${c.latitude.toFixed(7)}, ${c.longitude.toFixed(7)}`;
+      accuracyEl.textContent =
+        `Precisión: ${Math.round(c.accuracy)} m`;
 
-      const dist = haversineMeters(c.latitude, c.longitude, TARGET.lat, TARGET.lon);
-      distanceEl.textContent = `Distancia al Laboratorio: ${Math.round(dist)} m`;
+      const dist = haversineMeters(
+        c.latitude, c.longitude, TARGET.lat, TARGET.lon
+      );
+      distanceEl.textContent =
+        `Distancia al Laboratorio: ${Math.round(dist)} m`;
 
-  if (!objectsAdded) {
-  // Cubo magenta en la ubicación del laboratorio
-  const targetBox = makeBox(0xff00ff, 12);
-  locar.add(targetBox, TARGET.lat, TARGET.lon, 2);
+      if (!objectsAdded) {
+        const targetBox = makeBox(0xff00ff, 12);
+        locar.add(targetBox, TARGET.lat, TARGET.lon, 6);
 
-  // Cubos de referencia cardinales (más cerca: ~5 m)
-  const refs = [
-    { dLat:  0.00005, dLon:  0,      color: 0xff0000 }, // norte
-    { dLat: -0.00005, dLon:  0,      color: 0xffff00 }, // sur
-    { dLat:  0,       dLon: -0.00005, color: 0x00ffff }, // oeste
-    { dLat:  0,       dLon:  0.00005, color: 0x00ff00 }  // este
-  ];
+        const refs = [
+          { dLat:  0.0005, dLon:  0,      color: 0xff0000 }, // norte
+          { dLat: -0.0005, dLon:  0,      color: 0xffff00 }, // sur
+          { dLat:  0,      dLon: -0.0005, color: 0x00ffff }, // oeste
+          { dLat:  0,      dLon:  0.0005, color: 0x00ff00 }  // este
+        ];
 
-  for (const r of refs) {
-    const box = makeBox(r.color, 10);
-    locar.add(box, c.latitude + r.dLat, c.longitude + r.dLon, 2);
-  }
+        for (const r of refs) {
+          const box = makeBox(r.color, 10);
+          locar.add(
+            box,
+            c.latitude + r.dLat,
+            c.longitude + r.dLon,
+            5
+          );
+        }
 
-  objectsAdded = true;
-  setStatus("GPS inicial recibido. Gira lentamente 360° y busca los cubos.");
-  btn.style.display = "none";
-}
-
+        objectsAdded = true;
+        setStatus("GPS inicial recibido. Gira lentamente 360° y busca los cubos.");
+        btn.style.display = "none";
+      }
     });
 
     setStatus("Cámara iniciada. Solicitando ubicación GPS...");
