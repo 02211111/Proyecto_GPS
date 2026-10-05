@@ -1,156 +1,131 @@
-import * as THREE from "three";
-import { App } from "locar";
-
-const btn = document.getElementById("start");
-const statusEl = document.getElementById("status");
-const coordsEl = document.getElementById("coords");
-const accuracyEl = document.getElementById("accuracy");
-const distanceEl = document.getElementById("distance");
-const canvas = document.getElementById("ar-canvas");
-
+// Coordenada del Laboratorio de Redes (según la guía)
 const TARGET = {
   lat: -2.299114,
   lon: -78.118125,
   name: "LABORATORIO DE REDES"
 };
 
+// Referencias a los elementos del DOM
+const btn = document.getElementById("start");
+const statusEl = document.getElementById("status");
+const coordsEl = document.getElementById("coords");
+const accuracyEl = document.getElementById("accuracy");
+const distanceEl = document.getElementById("distance");
+const dynamicEntities = document.getElementById("dynamic-entities");
+
+// Función para actualizar el estado en la interfaz
 function setStatus(msg) {
   statusEl.textContent = msg;
   console.log("[Estado]", msg);
 }
 
+// Fórmula de Haversine para calcular la distancia entre dos coordenadas
 function haversineMeters(lat1, lon1, lat2, lon2) {
-  const R = 6371000;
+  const R = 6371000; // Radio de la Tierra en metros
   const toRad = d => d * Math.PI / 180;
   const p1 = toRad(lat1), p2 = toRad(lat2);
   const dp = toRad(lat2 - lat1);
   const dl = toRad(lon2 - lon1);
-  const a = Math.sin(dp/2)**2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl/2)**2;
+  const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-function makeBox(color, size = 10) {
-  return new THREE.Mesh(
-    new THREE.BoxGeometry(size, size, size),
-    new THREE.MeshBasicMaterial({ color })
-  );
+// Función para crear un cubo en A-Frame y añadirlo a la escena
+function addCubeToScene(lat, lon, color, size = 10, altitude = 5) {
+  const cube = document.createElement("a-box");
+  cube.setAttribute("color", color);
+  cube.setAttribute("depth", size);
+  cube.setAttribute("height", size);
+  cube.setAttribute("width", size);
+  // El componente gps-new-entity-place posiciona el objeto en el mundo real
+  cube.setAttribute("gps-new-entity-place", `latitude: ${lat}; longitude: ${lon};`);
+  // Ajustamos la elevación para que el cubo no esté a ras de suelo
+  cube.setAttribute("position", `0 ${altitude} 0`);
+  dynamicEntities.appendChild(cube);
+  console.log(`Cubo añadido en: ${lat}, ${lon}`);
 }
 
+// Manejador del botón de inicio
 btn.addEventListener("click", async () => {
   btn.disabled = true;
   btn.textContent = "INICIANDO...";
-  setStatus("Solicitando cámara y sensores...");
+  setStatus("Solicitando permisos de cámara y ubicación...");
 
-  try {
-    // --- DETECCIÓN DE PLATAFORMA PARA EVITAR EL BUG DE ANDROID ---
-    const isAndroid = /Android/i.test(navigator.userAgent);
+  // Detectar si es Android para posibles ajustes
+  const isAndroid = /Android/i.test(navigator.userAgent);
 
-    const app = new App({
-      canvas,
-      cameraOptions: {
-        hFov: 80,
-        near: 0.001,
-        far: 2000
-      },
-      videoConstraints: {
-        video: { facingMode: "environment" }
+  // Usamos la API de Geolocalización directamente para obtener la posición inicial
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      // Éxito: obtuvimos la posición
+      const c = position.coords;
+      console.log("Posición inicial obtenida:", c);
+
+      // Actualizamos la interfaz
+      coordsEl.textContent = `GPS: ${c.latitude.toFixed(7)}, ${c.longitude.toFixed(7)}`;
+      accuracyEl.textContent = `Precisión: ${Math.round(c.accuracy)} m`;
+      const dist = haversineMeters(c.latitude, c.longitude, TARGET.lat, TARGET.lon);
+      distanceEl.textContent = `Distancia al Laboratorio: ${Math.round(dist)} m`;
+
+      // Una vez que tenemos la posición, creamos los objetos en la escena
+      // 1. Cubo Magenta en la ubicación del laboratorio
+      addCubeToScene(TARGET.lat, TARGET.lon, "#ff00ff", 12, 6);
+
+      // 2. Cubos de referencia para los puntos cardinales a ~11 metros
+      const offset = 0.0001; // Aproximadamente 11 metros
+      addCubeToScene(c.latitude + offset, c.longitude, "#ff0000", 10, 5); // Norte
+      addCubeToScene(c.latitude - offset, c.longitude, "#ffff00", 10, 5); // Sur
+      addCubeToScene(c.latitude, c.longitude - offset, "#00ffff", 10, 5); // Oeste
+      addCubeToScene(c.latitude, c.longitude + offset, "#00ff00", 10, 5); // Este
+
+      // Ocultamos el botón y actualizamos el estado
+      btn.style.display = "none";
+      setStatus("✅ ¡Listo! Gira lentamente 360° y busca los cubos.");
+    },
+    (error) => {
+      // Error: no se pudo obtener la posición
+      console.error("Error de geolocalización:", error);
+      let mensaje = "";
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          mensaje = "Permiso denegado. Revisa los ajustes de ubicación de tu navegador y sistema operativo.";
+          break;
+        case error.POSITION_UNAVAILABLE:
+          mensaje = "Posición no disponible. Asegúrate de estar al aire libre y con buena señal GPS.";
+          break;
+        case error.TIMEOUT:
+          mensaje = "Tiempo de espera agotado. Intenta de nuevo en un lugar más despejado.";
+          break;
+        default:
+          mensaje = "Error desconocido al obtener la ubicación.";
       }
-    });
-
-    // Mostrar el feed de la cámara al iniciar
-    app.on("webcamstarted", (ev) => {
-      console.log("Cámara iniciada correctamente.");
-      app.scene.background = ev.texture;
-    });
-
-    app.on("webcamerror", (err) => {
-      console.error("Error de cámara:", err);
-      setStatus(`Error de cámara: ${err.message || err.code}`);
-    });
-
-    // Iniciar la App (esto pide permisos de cámara y orientación)
-    const locar = await app.start();
-
-    // --- CONFIGURACIÓN DE GPS CLAVE ---
-    // Se establece enableHighAccuracy en false para máxima compatibilidad con Android.
-    locar.setGpsOptions({
-      enableHighAccuracy: false, // <-- CAMBIO CRUCIAL
-      maximumAge: 0,
-      timeout: 30000
-    });
-
-    let objectsAdded = false;
-
-    // Manejo de errores de GPS muy explícito
-    locar.on("gpserror", (err) => {
-      const code = err?.code ?? "desconocido";
-      let mensaje = err?.message ?? "Error desconocido";
-
-      if (code === 1) {
-        mensaje = "Permiso denegado. Verifica que la página esté en HTTPS y que los permisos del sistema estén activados.";
-      } else if (code === 2) {
-        mensaje = "Posición no disponible. Asegúrate de que el GPS del dispositivo esté encendido y con señal.";
-      } else if (code === 3) {
-        mensaje = "Tiempo de espera agotado. El GPS no pudo obtener una posición a tiempo.";
-      }
-
-      setStatus(`❌ Error GPS [Código ${code}]: ${mensaje}`);
+      setStatus(`❌ Error GPS [Código ${error.code}]: ${mensaje}`);
       btn.disabled = false;
       btn.textContent = "REINTENTAR";
-    });
-
-    // Escuchar la primera actualización de GPS
-    locar.on("gpsupdate", (ev) => {
-      const c = ev.position.coords;
-
-      coordsEl.textContent =
-        `GPS: ${c.latitude.toFixed(7)}, ${c.longitude.toFixed(7)}`;
-      accuracyEl.textContent =
-        `Precisión: ${Math.round(c.accuracy)} m`;
-
-      const dist = haversineMeters(
-        c.latitude, c.longitude, TARGET.lat, TARGET.lon
-      );
-      distanceEl.textContent =
-        `Distancia al Laboratorio: ${Math.round(dist)} m`;
-
-      if (!objectsAdded) {
-        const targetBox = makeBox(0xff00ff, 12);
-        locar.add(targetBox, TARGET.lon, TARGET.lat, 6);
-
-        const offset = 0.0001;
-        const refs = [
-          { dLat:  offset, dLon:  0,      color: 0xff0000 }, // Norte
-          { dLat: -offset, dLon:  0,      color: 0xffff00 }, // Sur
-          { dLat:  0,      dLon: -offset, color: 0x00ffff }, // Oeste
-          { dLat:  0,      dLon:  offset, color: 0x00ff00 }  // Este
-        ];
-
-        for (const r of refs) {
-          const box = makeBox(r.color, 10);
-          locar.add(
-            box,
-            c.longitude + r.dLon,
-            c.latitude + r.dLat,
-            5
-          );
-        }
-
-        objectsAdded = true;
-        setStatus("✅ GPS inicial recibido. Gira lentamente 360° y busca los cubos.");
-        btn.style.display = "none";
-      }
-    });
-
-    setStatus("Cámara iniciada. Solicitando ubicación GPS...");
-    await locar.startGps();
-
-  } catch (e) {
-    console.error("Error fatal:", e);
-    const msg = e?.message || String(e);
-    setStatus(`❌ No se pudo iniciar AR: ${msg}`);
-    btn.disabled = false;
-    btn.textContent = "REINTENTAR";
-  }
+    },
+    {
+      enableHighAccuracy: true, // Alta precisión para AR
+      timeout: 30000,
+      maximumAge: 0
+    }
+  );
 });
 
+// Opcional: Escuchar actualizaciones continuas de posición para actualizar la distancia
+navigator.geolocation.watchPosition(
+  (position) => {
+    const c = position.coords;
+    coordsEl.textContent = `GPS: ${c.latitude.toFixed(7)}, ${c.longitude.toFixed(7)}`;
+    accuracyEl.textContent = `Precisión: ${Math.round(c.accuracy)} m`;
+    const dist = haversineMeters(c.latitude, c.longitude, TARGET.lat, TARGET.lon);
+    distanceEl.textContent = `Distancia al Laboratorio: ${Math.round(dist)} m`;
+  },
+  (error) => {
+    console.warn("Error en watchPosition:", error);
+  },
+  {
+    enableHighAccuracy: true,
+    timeout: 27000,
+    maximumAge: 0
+  }
+);
