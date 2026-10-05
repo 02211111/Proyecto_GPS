@@ -83,9 +83,11 @@ btn.addEventListener("click", async () => {
       distanceEl.textContent = `Distancia al Laboratorio: ${Math.round(dist)} m`;
 
       if (!objectsAdded) {
+        // Cubo magenta en la ubicación del laboratorio
         const targetBox = makeBox(0xff00ff, 12);
-        locar.add(targetBox, TARGET.lon, TARGET.lat, 6);
+        locar.add(targetBox, TARGET.lat, TARGET.lon, 2);
 
+        // Cubos de referencia cardinales
         const refs = [
           { dLat:  0.0005, dLon:  0,      color: 0xff0000 }, // norte
           { dLat: -0.0005, dLon:  0,      color: 0xffff00 }, // sur
@@ -95,7 +97,7 @@ btn.addEventListener("click", async () => {
 
         for (const r of refs) {
           const box = makeBox(r.color, 10);
-          locar.add(box, c.longitude + r.dLon, c.latitude + r.dLat, 5);
+          locar.add(box, c.latitude + r.dLat, c.longitude + r.dLon, 2);
         }
 
         objectsAdded = true;
@@ -115,4 +117,5 @@ btn.addEventListener("click", async () => {
     btn.textContent = "REINTENTAR";
   }
 });
+
 
