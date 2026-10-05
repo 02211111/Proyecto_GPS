@@ -8,7 +8,6 @@ const accuracyEl = document.getElementById("accuracy");
 const distanceEl = document.getElementById("distance");
 const canvas = document.getElementById("ar-canvas");
 
-// Coordenada del Laboratorio de Redes (según la guía)
 const TARGET = {
   lat: -2.299114,
   lon: -78.118125,
@@ -43,9 +42,8 @@ btn.addEventListener("click", async () => {
   setStatus("Solicitando cámara y sensores...");
 
   try {
-    // ✅ 1. Detección de plataforma para evitar el bug de Android
+    // --- DETECCIÓN DE PLATAFORMA PARA EVITAR EL BUG DE ANDROID ---
     const isAndroid = /Android/i.test(navigator.userAgent);
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
     const app = new App({
       canvas,
@@ -54,14 +52,12 @@ btn.addEventListener("click", async () => {
         near: 0.001,
         far: 2000
       },
-      // ✅ 2. La cámara se muestra escuchando el evento 'webcamstarted'
-      //    (showVideoBackground ya no es válido en versiones recientes)
       videoConstraints: {
         video: { facingMode: "environment" }
       }
     });
 
-    // ✅ 3. Mostrar el feed de la cámara al iniciar
+    // Mostrar el feed de la cámara al iniciar
     app.on("webcamstarted", (ev) => {
       console.log("Cámara iniciada correctamente.");
       app.scene.background = ev.texture;
@@ -72,19 +68,20 @@ btn.addEventListener("click", async () => {
       setStatus(`Error de cámara: ${err.message || err.code}`);
     });
 
-    // ✅ 4. Iniciar la App (pide permisos de cámara y orientación)
+    // Iniciar la App (esto pide permisos de cámara y orientación)
     const locar = await app.start();
 
-    // ✅ 5. Configurar GPS
+    // --- CONFIGURACIÓN DE GPS CLAVE ---
+    // Se establece enableHighAccuracy en false para máxima compatibilidad con Android.
     locar.setGpsOptions({
-      enableHighAccuracy: true,
+      enableHighAccuracy: false, // <-- CAMBIO CRUCIAL
       maximumAge: 0,
       timeout: 30000
     });
 
     let objectsAdded = false;
 
-    // ✅ 6. Manejo de errores de GPS muy explícito
+    // Manejo de errores de GPS muy explícito
     locar.on("gpserror", (err) => {
       const code = err?.code ?? "desconocido";
       let mensaje = err?.message ?? "Error desconocido";
@@ -102,7 +99,7 @@ btn.addEventListener("click", async () => {
       btn.textContent = "REINTENTAR";
     });
 
-    // ✅ 7. Escuchar la primera actualización de GPS
+    // Escuchar la primera actualización de GPS
     locar.on("gpsupdate", (ev) => {
       const c = ev.position.coords;
 
@@ -117,13 +114,10 @@ btn.addEventListener("click", async () => {
       distanceEl.textContent =
         `Distancia al Laboratorio: ${Math.round(dist)} m`;
 
-      // ✅ 8. Añadir los objetos solo después de la primera posición GPS
       if (!objectsAdded) {
-        // Cubo magenta en la ubicación exacta del laboratorio.
         const targetBox = makeBox(0xff00ff, 12);
         locar.add(targetBox, TARGET.lon, TARGET.lat, 6);
 
-        // Cubos de referencia a ~11 metros para visibilidad inmediata.
         const offset = 0.0001;
         const refs = [
           { dLat:  offset, dLon:  0,      color: 0xff0000 }, // Norte
