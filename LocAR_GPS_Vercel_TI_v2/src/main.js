@@ -49,10 +49,10 @@ btn.addEventListener("click", async () => {
         near: 0.001,
         far: 2000
       },
-      showVideoBackground: true
       videoConstraints: {
         video: { facingMode: "environment" }
-      }
+      },
+      showVideoBackground: true
     });
 
     // App.start() inicia cámara/orientación y entrega el objeto LocAR.
