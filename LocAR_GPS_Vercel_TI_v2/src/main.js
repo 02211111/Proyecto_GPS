@@ -9,9 +9,9 @@ const distanceEl = document.getElementById("distance");
 const canvas = document.getElementById("ar-canvas");
 
 const TARGET = {
-  lat: -2.291122,
-  lon: -78.1141843,
-  name: "LABORATORIO DE REDES"
+  lat: -2.303128,
+  lon: -78.11885,
+  name: "Pizzeria Italiana"
 };
 
 function setStatus(msg) {
@@ -51,7 +51,8 @@ btn.addEventListener("click", async () => {
       },
       videoConstraints: {
         video: { facingMode: "environment" }
-      }
+      },
+      showVideoBackground: true
     });
 
     // App.start() inicia cámara/orientación y entrega el objeto LocAR.
