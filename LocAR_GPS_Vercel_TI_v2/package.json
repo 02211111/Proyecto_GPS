@@ -1,9 +1,8 @@
 {
   "name": "ar-gps-laboratorio-redes",
   "version": "2.0.0",
-  "description": "AR geolocalizada con AR.js + A-Frame",
-  "scripts": {
-    "start": "serve ."
-  },
+  "description": "AR geolocalizada con AR.js + A-Frame (sitio estático)",
+  "private": true,
+  "scripts": {},
   "license": "MIT"
 }
