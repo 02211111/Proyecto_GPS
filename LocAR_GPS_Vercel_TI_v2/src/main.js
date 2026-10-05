@@ -82,17 +82,17 @@ btn.addEventListener("click", async () => {
       const dist = haversineMeters(c.latitude, c.longitude, TARGET.lat, TARGET.lon);
       distanceEl.textContent = `Distancia al Laboratorio: ${Math.round(dist)} m`;
 
-      if (!objectsAdded) {
+  if (!objectsAdded) {
   // Cubo magenta en la ubicación del laboratorio
   const targetBox = makeBox(0xff00ff, 12);
   locar.add(targetBox, TARGET.lat, TARGET.lon, 2);
 
-  // Cubos de referencia cardinales
+  // Cubos de referencia cardinales (más cerca: ~11 m)
   const refs = [
-    { dLat:  0.0005, dLon:  0,      color: 0xff0000 }, // norte
-    { dLat: -0.0005, dLon:  0,      color: 0xffff00 }, // sur
-    { dLat:  0,      dLon: -0.0005, color: 0x00ffff }, // oeste
-    { dLat:  0,      dLon:  0.0005, color: 0x00ff00 }  // este
+    { dLat:  0.0001, dLon:  0,      color: 0xff0000 }, // norte
+    { dLat: -0.0001, dLon:  0,      color: 0xffff00 }, // sur
+    { dLat:  0,      dLon: -0.0001, color: 0x00ffff }, // oeste
+    { dLat:  0,      dLon:  0.0001, color: 0x00ff00 }  // este
   ];
 
   for (const r of refs) {
@@ -104,6 +104,7 @@ btn.addEventListener("click", async () => {
   setStatus("GPS inicial recibido. Gira lentamente 360° y busca los cubos.");
   btn.style.display = "none";
 }
+
 
     });
 
