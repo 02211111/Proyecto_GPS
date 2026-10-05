@@ -8,15 +8,22 @@ const accuracyEl = document.getElementById("accuracy");
 const distanceEl = document.getElementById("distance");
 const canvas = document.getElementById("ar-canvas");
 
+// Inicializar video de cámara como fondo
+const videoEl = document.getElementById("camera");
+navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+  .then(stream => { videoEl.srcObject = stream; })
+  .catch(err => {
+    console.error("Error al iniciar cámara:", err);
+    setStatus("No se pudo acceder a la cámara");
+  });
+
 const TARGET = {
-  lat: -2.303128,
-  lon: -78.11885,
-  name: "Pizzeria Italiana"
+  lat: -2.291122,
+  lon: -78.1141843,
+  name: "LABORATORIO DE REDES"
 };
 
-function setStatus(msg) {
-  statusEl.textContent = msg;
-}
+function setStatus(msg) { statusEl.textContent = msg; }
 
 function haversineMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000;
@@ -44,21 +51,12 @@ btn.addEventListener("click", async () => {
   try {
     const app = new App({
       canvas,
-      cameraOptions: {
-        hFov: 80,
-        near: 0.001,
-        far: 2000
-      },
-      videoConstraints: {
-        video: { facingMode: "environment" }
-      },
-      showVideoBackground: true
+      cameraOptions: { hFov: 80, near: 0.001, far: 2000 },
+      videoConstraints: { video: { facingMode: "environment" } }
     });
 
-    // App.start() inicia cámara/orientación y entrega el objeto LocAR.
     const locar = await app.start();
 
-    // Configurar GPS ANTES de arrancarlo.
     locar.setGpsOptions({
       enableHighAccuracy: true,
       maximumAge: 0,
@@ -78,21 +76,12 @@ btn.addEventListener("click", async () => {
     locar.on("gpsupdate", (ev) => {
       const c = ev.position.coords;
 
-      coordsEl.textContent =
-        `GPS: ${c.latitude.toFixed(7)}, ${c.longitude.toFixed(7)}`;
-      accuracyEl.textContent =
-        `Precisión: ${Math.round(c.accuracy)} m`;
+      coordsEl.textContent = `GPS: ${c.latitude.toFixed(7)}, ${c.longitude.toFixed(7)}`;
+      accuracyEl.textContent = `Precisión: ${Math.round(c.accuracy)} m`;
 
-      const dist = haversineMeters(
-        c.latitude, c.longitude, TARGET.lat, TARGET.lon
-      );
-      distanceEl.textContent =
-        `Distancia al Laboratorio: ${Math.round(dist)} m`;
+      const dist = haversineMeters(c.latitude, c.longitude, TARGET.lat, TARGET.lon);
+      distanceEl.textContent = `Distancia al Laboratorio: ${Math.round(dist)} m`;
 
-      // IMPORTANTE:
-      // LocAR no puede convertir lat/lon a coordenadas 3D antes de tener
-      // una posición GPS inicial. Por eso los objetos se agregan recién
-      // dentro del primer gpsupdate.
       if (!objectsAdded) {
         const targetBox = makeBox(0xff00ff, 12);
         locar.add(targetBox, TARGET.lon, TARGET.lat, 6);
@@ -106,12 +95,7 @@ btn.addEventListener("click", async () => {
 
         for (const r of refs) {
           const box = makeBox(r.color, 10);
-          locar.add(
-            box,
-            c.longitude + r.dLon,
-            c.latitude + r.dLat,
-            5
-          );
+          locar.add(box, c.longitude + r.dLon, c.latitude + r.dLat, 5);
         }
 
         objectsAdded = true;
@@ -131,3 +115,4 @@ btn.addEventListener("click", async () => {
     btn.textContent = "REINTENTAR";
   }
 });
+
