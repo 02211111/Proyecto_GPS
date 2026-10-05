@@ -5,11 +5,31 @@ const btn = document.getElementById("start");
 const statusEl = document.getElementById("status");
 const coordsEl = document.getElementById("coords");
 const accuracyEl = document.getElementById("accuracy");
+const distanceEl = document.getElementById("distance");
 const canvas = document.getElementById("ar-canvas");
 
-function setStatus(msg) { statusEl.textContent = msg; }
+const TARGET = {
+  lat: -2.291122,
+  lon: -78.1141843,
+  name: "LABORATORIO DE REDES"
+};
 
-function makeBox(color, size=10) {
+function setStatus(msg) {
+  statusEl.textContent = msg;
+}
+
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const p1 = toRad(lat1), p2 = toRad(lat2);
+  const dp = toRad(lat2 - lat1);
+  const dl = toRad(lon2 - lon1);
+  const a = Math.sin(dp / 2) ** 2 +
+            Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function makeBox(color, size = 10) {
   return new THREE.Mesh(
     new THREE.BoxGeometry(size, size, size),
     new THREE.MeshBasicMaterial({ color })
@@ -18,59 +38,106 @@ function makeBox(color, size=10) {
 
 btn.addEventListener("click", async () => {
   btn.disabled = true;
-  btn.textContent = "Iniciando...";
-  setStatus("Solicitando cámara y ubicación...");
+  btn.textContent = "INICIANDO...";
+  setStatus("Solicitando cámara y sensores...");
 
   try {
     const app = new App({
       canvas,
-      cameraOptions: { hFov: 80, near: 0.001, far: 2000 },
-      showVideoBackground: true,
-      videoConstraints: { video: { facingMode: "environment" } }
+      cameraOptions: {
+        hFov: 80,
+        near: 0.001,
+        far: 2000
+      },
+      videoConstraints: {
+        video: { facingMode: "environment" }
+      }
     });
 
+    // ✅ CAMBIO 1: Usar el evento 'webcamstarted' para mostrar el video de la cámara.
+    //    Esto reemplaza a la opción 'showVideoBackground' que no funciona.
+    app.on("webcamstarted", (ev) => {
+      app.scene.background = ev.texture;
+    });
+
+    // App.start() inicia cámara/orientación y entrega el objeto LocAR.
     const locar = await app.start();
 
+    // Configurar GPS ANTES de arrancarlo.
     locar.setGpsOptions({
       enableHighAccuracy: true,
       maximumAge: 0,
-      timeout: 60000
+      timeout: 30000
     });
 
-    let added = false;
+    let objectsAdded = false;
 
-    locar.on("gpserror", () => {
-      setStatus("Error GPS: activa ubicación en el navegador.");
+    locar.on("gpserror", (err) => {
+      const code = err?.code ?? "";
+      const msg = err?.message ?? "Error desconocido";
+      setStatus(`Error GPS ${code}: ${msg}`);
       btn.disabled = false;
       btn.textContent = "REINTENTAR";
     });
 
     locar.on("gpsupdate", (ev) => {
       const c = ev.position.coords;
-      coordsEl.textContent = `GPS: ${c.latitude.toFixed(6)}, ${c.longitude.toFixed(6)}`;
-      accuracyEl.textContent = `Precisión: ${Math.round(c.accuracy)} m`;
 
-      if (!added) {
-        // Cubo justo en tu posición
-        const meBox = makeBox(0x00ff00, 12);
-        locar.add(meBox, c.latitude, c.longitude, 2);
+      coordsEl.textContent =
+        `GPS: ${c.latitude.toFixed(7)}, ${c.longitude.toFixed(7)}`;
+      accuracyEl.textContent =
+        `Precisión: ${Math.round(c.accuracy)} m`;
 
-        // Cubo de prueba a 10 m norte
-        const northBox = makeBox(0xff0000, 10);
-        locar.add(northBox, c.latitude + 0.0001, c.longitude, 2);
+      const dist = haversineMeters(
+        c.latitude, c.longitude, TARGET.lat, TARGET.lon
+      );
+      distanceEl.textContent =
+        `Distancia al Laboratorio: ${Math.round(dist)} m`;
 
-        added = true;
-        setStatus("Cubos añadidos. Gira lentamente y búscalos.");
+      // IMPORTANTE:
+      // LocAR no puede convertir lat/lon a coordenadas 3D antes de tener
+      // una posición GPS inicial. Por eso los objetos se agregan recién
+      // dentro del primer gpsupdate.
+      if (!objectsAdded) {
+        // ✅ CAMBIO 2: Se reducen los desplazamientos (offsets) para que los
+        //    cubos de los puntos cardinales estén más cerca y sean visibles
+        //    al instante (aprox. 11 metros en lugar de 55).
+        const offset = 0.0001;
+
+        // Cubo magenta en la ubicación exacta del laboratorio.
+        const targetBox = makeBox(0xff00ff, 12);
+        locar.add(targetBox, TARGET.lon, TARGET.lat, 6);
+
+        const refs = [
+          { dLat:  offset, dLon:  0,      color: 0xff0000 }, // Norte
+          { dLat: -offset, dLon:  0,      color: 0xffff00 }, // Sur
+          { dLat:  0,      dLon: -offset, color: 0x00ffff }, // Oeste
+          { dLat:  0,      dLon:  offset, color: 0x00ff00 }  // Este
+        ];
+
+        for (const r of refs) {
+          const box = makeBox(r.color, 10);
+          locar.add(
+            box,
+            c.longitude + r.dLon,
+            c.latitude + r.dLat,
+            5
+          );
+        }
+
+        objectsAdded = true;
+        setStatus("GPS inicial recibido. Gira lentamente 360° y busca los cubos.");
         btn.style.display = "none";
       }
     });
 
-    setStatus("Cámara iniciada. Esperando señal GPS...");
+    setStatus("Cámara iniciada. Solicitando ubicación GPS...");
     await locar.startGps();
 
   } catch (e) {
     console.error(e);
-    setStatus("Error al iniciar AR: " + (e.message || e));
+    const msg = e?.message || String(e);
+    setStatus(`No se pudo iniciar AR: ${msg}`);
     btn.disabled = false;
     btn.textContent = "REINTENTAR";
   }
