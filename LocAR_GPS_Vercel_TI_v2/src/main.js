@@ -8,14 +8,16 @@ const accuracyEl = document.getElementById("accuracy");
 const distanceEl = document.getElementById("distance");
 const canvas = document.getElementById("ar-canvas");
 
+// Coordenada del Laboratorio de Redes (según la guía)
 const TARGET = {
-  lat: -2.291122,
-  lon: -78.1141843,
+  lat: -2.299114,
+  lon: -78.118125,
   name: "LABORATORIO DE REDES"
 };
 
 function setStatus(msg) {
   statusEl.textContent = msg;
+  console.log("[Estado]", msg);
 }
 
 function haversineMeters(lat1, lon1, lat2, lon2) {
@@ -24,8 +26,7 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
   const p1 = toRad(lat1), p2 = toRad(lat2);
   const dp = toRad(lat2 - lat1);
   const dl = toRad(lon2 - lon1);
-  const a = Math.sin(dp / 2) ** 2 +
-            Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  const a = Math.sin(dp/2)**2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl/2)**2;
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
@@ -42,6 +43,10 @@ btn.addEventListener("click", async () => {
   setStatus("Solicitando cámara y sensores...");
 
   try {
+    // ✅ 1. Detección de plataforma para evitar el bug de Android
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
     const app = new App({
       canvas,
       cameraOptions: {
@@ -49,21 +54,28 @@ btn.addEventListener("click", async () => {
         near: 0.001,
         far: 2000
       },
+      // ✅ 2. La cámara se muestra escuchando el evento 'webcamstarted'
+      //    (showVideoBackground ya no es válido en versiones recientes)
       videoConstraints: {
         video: { facingMode: "environment" }
       }
     });
 
-    // ✅ CAMBIO 1: Usar el evento 'webcamstarted' para mostrar el video de la cámara.
-    //    Esto reemplaza a la opción 'showVideoBackground' que no funciona.
+    // ✅ 3. Mostrar el feed de la cámara al iniciar
     app.on("webcamstarted", (ev) => {
+      console.log("Cámara iniciada correctamente.");
       app.scene.background = ev.texture;
     });
 
-    // App.start() inicia cámara/orientación y entrega el objeto LocAR.
+    app.on("webcamerror", (err) => {
+      console.error("Error de cámara:", err);
+      setStatus(`Error de cámara: ${err.message || err.code}`);
+    });
+
+    // ✅ 4. Iniciar la App (pide permisos de cámara y orientación)
     const locar = await app.start();
 
-    // Configurar GPS ANTES de arrancarlo.
+    // ✅ 5. Configurar GPS
     locar.setGpsOptions({
       enableHighAccuracy: true,
       maximumAge: 0,
@@ -72,14 +84,25 @@ btn.addEventListener("click", async () => {
 
     let objectsAdded = false;
 
+    // ✅ 6. Manejo de errores de GPS muy explícito
     locar.on("gpserror", (err) => {
-      const code = err?.code ?? "";
-      const msg = err?.message ?? "Error desconocido";
-      setStatus(`Error GPS ${code}: ${msg}`);
+      const code = err?.code ?? "desconocido";
+      let mensaje = err?.message ?? "Error desconocido";
+
+      if (code === 1) {
+        mensaje = "Permiso denegado. Verifica que la página esté en HTTPS y que los permisos del sistema estén activados.";
+      } else if (code === 2) {
+        mensaje = "Posición no disponible. Asegúrate de que el GPS del dispositivo esté encendido y con señal.";
+      } else if (code === 3) {
+        mensaje = "Tiempo de espera agotado. El GPS no pudo obtener una posición a tiempo.";
+      }
+
+      setStatus(`❌ Error GPS [Código ${code}]: ${mensaje}`);
       btn.disabled = false;
       btn.textContent = "REINTENTAR";
     });
 
+    // ✅ 7. Escuchar la primera actualización de GPS
     locar.on("gpsupdate", (ev) => {
       const c = ev.position.coords;
 
@@ -94,20 +117,14 @@ btn.addEventListener("click", async () => {
       distanceEl.textContent =
         `Distancia al Laboratorio: ${Math.round(dist)} m`;
 
-      // IMPORTANTE:
-      // LocAR no puede convertir lat/lon a coordenadas 3D antes de tener
-      // una posición GPS inicial. Por eso los objetos se agregan recién
-      // dentro del primer gpsupdate.
+      // ✅ 8. Añadir los objetos solo después de la primera posición GPS
       if (!objectsAdded) {
-        // ✅ CAMBIO 2: Se reducen los desplazamientos (offsets) para que los
-        //    cubos de los puntos cardinales estén más cerca y sean visibles
-        //    al instante (aprox. 11 metros en lugar de 55).
-        const offset = 0.0001;
-
         // Cubo magenta en la ubicación exacta del laboratorio.
         const targetBox = makeBox(0xff00ff, 12);
         locar.add(targetBox, TARGET.lon, TARGET.lat, 6);
 
+        // Cubos de referencia a ~11 metros para visibilidad inmediata.
+        const offset = 0.0001;
         const refs = [
           { dLat:  offset, dLon:  0,      color: 0xff0000 }, // Norte
           { dLat: -offset, dLon:  0,      color: 0xffff00 }, // Sur
@@ -126,7 +143,7 @@ btn.addEventListener("click", async () => {
         }
 
         objectsAdded = true;
-        setStatus("GPS inicial recibido. Gira lentamente 360° y busca los cubos.");
+        setStatus("✅ GPS inicial recibido. Gira lentamente 360° y busca los cubos.");
         btn.style.display = "none";
       }
     });
@@ -135,9 +152,9 @@ btn.addEventListener("click", async () => {
     await locar.startGps();
 
   } catch (e) {
-    console.error(e);
+    console.error("Error fatal:", e);
     const msg = e?.message || String(e);
-    setStatus(`No se pudo iniciar AR: ${msg}`);
+    setStatus(`❌ No se pudo iniciar AR: ${msg}`);
     btn.disabled = false;
     btn.textContent = "REINTENTAR";
   }
